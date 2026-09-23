@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="de" class="scroll-smooth">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Lager Verlauf - Finanzverwaltung</title>
+    
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: { background: '#0F111A', surface: '#1A1D27', primary: '#60A5FA', danger: '#EF4444' }
+                }
+            }
+        }
+    </script>
+    
+    <style>
+        body { background-color: #0F111A; color: #F3F4F6; }
+        .glass-nav { background: rgba(26, 29, 39, 0.85); backdrop-filter: blur(12px); border-bottom: 1px solid rgba(255,255,255,0.05); }
+        .glow-bg { position: absolute; width: 600px; height: 600px; background: radial-gradient(circle, rgba(96,165,250,0.15) 0%, rgba(15,17,26,0) 70%); top: -200px; left: 50%; transform: translateX(-50%); z-index: -1; pointer-events: none; }
+        ::-webkit-scrollbar { height: 8px; width: 8px; }
+        ::-webkit-scrollbar-track { background: #0F111A; }
+        ::-webkit-scrollbar-thumb { background: #374151; border-radius: 4px; }
+        /* Stil pentru săgeata de acordeon */
+        details > summary { list-style: none; }
+        details > summary::-webkit-details-marker { display: none; }
+    </style>
+</head>
+<body class="antialiased relative overflow-x-hidden min-h-screen flex flex-col">
+
+    <div class="glow-bg"></div>
+
+    <nav class="glass-nav fixed w-full z-40 transition-all duration-300">
+        <div class="max-w-7xl mx-auto px-6 h-20 flex items-center justify-between">
+            <div class="flex items-center gap-3 font-bold text-2xl tracking-tight">
+                <i class="fa-solid fa-boxes-stacked text-primary"></i>
+                <span>Finanz<span class="text-primary">verwaltung</span></span>
+            </div>
+            <div class="flex items-center gap-4 text-sm font-medium">
+                <a href="/index" class="bg-gray-800 hover:bg-gray-700 text-white px-4 py-2 rounded-lg transition flex items-center gap-2">
+                    <i class="fa-solid fa-arrow-left"></i> <span class="hidden sm:inline">Dashboard</span>
+                </a>
+                <span class="text-gray-400 hidden sm:inline-block">Angemeldet als: <strong class="text-white">{{ user }}</strong></span>
+                <a href="/logout" class="bg-red-500/10 text-red-500 border border-red-500/20 hover:bg-red-500 hover:text-white px-4 py-2 rounded-lg transition flex items-center gap-2">
+                    <i class="fa-solid fa-right-from-bracket"></i> <span class="hidden sm:inline">Abmelden</span>
+                </a>
+            </div>
+        </div>
+    </nav>
+
+    <main class="flex-1 pt-32 pb-12 px-6 relative z-10 max-w-7xl mx-auto w-full space-y-8">
+
+        <div class="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+            <div>
+                <h1 class="text-4xl font-extrabold tracking-tight mb-2">Lager Verlauf</h1>
+                <p class="text-gray-400">Kumulierte Übersicht nach Mitarbeiter und Auftrag.</p>
+            </div>
+        </div>
+
+        <!-- LISTA GRUPATĂ (ACORDEON) -->
+        <div class="space-y-4">
+            {% if date_grupate %}
+                {% for angajat, comenzi in date_grupate.items() %}
+                
+                <details class="bg-surface rounded-xl border border-gray-800 group overflow-hidden shadow-xl" open>
+                    <!-- Header Angajat -->
+                    <summary class="cursor-pointer bg-[#141620] p-5 flex justify-between items-center font-bold text-lg hover:bg-gray-800/50 transition">
+                        <div class="flex items-center gap-3 text-orange-400">
+                            <div class="w-10 h-10 rounded-full bg-orange-500/10 flex items-center justify-center border border-orange-500/20">
+                                <i class="fa-solid fa-user-tie"></i>
+                            </div>
+                            <span class="tracking-wide">{{ angajat }}</span>
+                            <span class="text-xs text-gray-500 bg-gray-900 px-2 py-1 rounded-full border border-gray-700">{{ comenzi|length }} Aufträge</span>
+                        </div>
+                        <i class="fa-solid fa-chevron-down text-gray-500 group-open:rotate-180 transition-transform"></i>
+                    </summary>
+                    
+                    <!-- Conținut (Comenzile angajatului) -->
+                    <div class="p-5 space-y-6">
+                        {% for auftrag, produse in comenzi.items() %}
+                            <div class="border border-gray-800 rounded-lg overflow-hidden bg-[#0F111A]">
+                                <!-- Header Comandă -->
+                                <div class="bg-blue-500/5 p-3 px-4 border-b border-gray-800 flex justify-between items-center">
+                                    <span class="font-bold text-blue-400 tracking-wider">Auftrag: <span class="text-white">{{ auftrag }}</span></span>
+                                    <span class="text-xs text-gray-500"><i class="fa-regular fa-clock"></i> Zuletzt: {{ produse[0].data }}</span>
+                                </div>
+                                
+                                <!-- Tabel Produse pentru această comandă -->
+                                <table class="w-full text-left border-collapse">
+                                    <tbody class="divide-y divide-gray-800/30">
+                                        {% for p in produse %}
+                                        <tr class="hover:bg-gray-800/30 transition">
+                                            <td class="py-3 px-4 text-gray-200 font-medium text-sm flex items-center gap-2">
+                                                <i class="fa-solid fa-wine-bottle text-gray-600"></i> {{ p.produs }}
+                                            </td>
+                                            <td class="py-3 px-4 text-emerald-400 font-bold text-right w-32">
+                                                - {{ p.cantitate }} Fl.
+                                            </td>
+                                        </tr>
+                                        {% endfor %}
+                                    </tbody>
+                                </table>
+                            </div>
+                        {% endfor %}
+                    </div>
+                </details>
+                
+                {% endfor %}
+            {% else %}
+                <div class="bg-surface rounded-xl border border-gray-800 p-10 text-center text-gray-500">
+                    <i class="fa-solid fa-box-open text-4xl mb-3 opacity-50"></i>
+                    <p>Noch keine Scans im Lager durchgeführt.</p>
+                </div>
+            {% endif %}
+        </div>
+
+    </main>
+
+    <footer class="py-6 border-t border-gray-800/50 mt-auto bg-[#141620]">
+        <div class="max-w-7xl mx-auto px-6 text-center text-gray-500 text-sm">
+            &copy; 2026 Finanzverwaltung System.
+        </div>
+    </footer>
+</body>
+</html>
