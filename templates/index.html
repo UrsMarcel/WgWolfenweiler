@@ -1,0 +1,360 @@
+<!DOCTYPE html>
+<html lang="de" class="scroll-smooth">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Finanz-Dashboard</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/themes/dark.css">
+    <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
+    <script src="https://npmcdn.com/flatpickr/dist/l10n/de.js"></script>
+    <script>
+        tailwind.config = { darkMode: 'class', theme: { extend: { colors: { background: '#0F111A', surface: '#1A1D27', primary: '#60A5FA', danger: '#EF4444' } } } }
+    </script>
+    <style>
+        body { background-color: #0F111A; color: #F3F4F6; }
+        .glass-nav { background: rgba(26, 29, 39, 0.85); backdrop-filter: blur(12px); border-bottom: 1px solid rgba(255,255,255,0.05); }
+        .glow-bg { position: absolute; width: 600px; height: 600px; background: radial-gradient(circle, rgba(96,165,250,0.15) 0%, rgba(15,17,26,0) 70%); top: -200px; left: 50%; transform: translateX(-50%); z-index: -1; pointer-events: none; }
+        .input-field { width: 100%; background-color: #0F111A; border: 1px solid #374151; color: white; padding: 0.75rem 1rem; border-radius: 0.5rem; outline: none; transition: border-color 0.2s; }
+        .input-field:focus { border-color: #60A5FA; }
+        ::-webkit-scrollbar { height: 8px; width: 8px; }
+        ::-webkit-scrollbar-track { background: #0F111A; }
+        ::-webkit-scrollbar-thumb { background: #374151; border-radius: 4px; }
+    </style>
+</head>
+<body class="antialiased relative overflow-x-hidden min-h-screen flex flex-col">
+    <div class="glow-bg"></div>
+    <nav class="glass-nav fixed w-full z-40 transition-all duration-300">
+        <div class="max-w-7xl mx-auto px-6 h-20 flex items-center justify-between">
+            <div class="flex items-center gap-3 font-bold text-2xl tracking-tight">
+                <i class="fa-solid fa-chart-pie text-primary"></i> <span>Finanz<span class="text-primary">verwaltung</span></span>
+            </div>
+            <div class="flex items-center gap-4 text-sm font-medium">
+                <a href="/istoric" class="bg-gray-800 hover:bg-gray-700 text-primary border border-primary/20 px-4 py-2 rounded-lg transition flex items-center gap-2"><i class="fa-solid fa-clock-rotate-left"></i> <span class="hidden sm:inline">Verlauf</span></a>
+                <span class="text-gray-400 hidden sm:inline-block">Angemeldet als: <strong class="text-white">{{ user }}</strong></span>
+                <a href="/logout" class="bg-red-500/10 text-red-500 border border-red-500/20 hover:bg-red-500 hover:text-white px-4 py-2 rounded-lg transition flex items-center gap-2"><i class="fa-solid fa-right-from-bracket"></i> <span class="hidden sm:inline">Abmelden</span></a>
+            </div>
+        </div>
+    </nav>
+
+    <main class="flex-1 pt-32 pb-12 px-6 relative z-10 max-w-7xl mx-auto w-full">
+        <!-- Am scos div-ul de închidere eronat de aici din IF și l-am mutat corect -->
+        <div class="mb-10 flex flex-col md:flex-row justify-between items-start md:items-end gap-4">
+            <div>
+                <h1 class="text-4xl font-extrabold tracking-tight mb-2">Zentrales Dashboard</h1>
+                <p class="text-gray-400">Verkäufe erfassen, Bestand verwalten und Bilanz verfolgen.</p>
+
+                <!-- BUTOANE PENTRU LAGER & SCANNER -->
+                <div class="flex flex-wrap gap-3 mt-4">
+                    <a href="/scanare" class="bg-blue-600 hover:bg-blue-500 text-white font-bold px-4 py-2.5 rounded-xl transition flex items-center gap-2 text-sm shadow-lg shadow-blue-500/20">
+                        <i class="fa-solid fa-barcode"></i> Aufträge Scan
+                    </a>
+                    
+                    <a href="/gestioneaza_stoc" class="bg-emerald-600 hover:bg-emerald-500 text-white font-bold px-4 py-2.5 rounded-xl transition flex items-center gap-2 text-sm shadow-lg shadow-emerald-500/20">
+                        <i class="fa-solid fa-boxes-stacked"></i> Bestand verwalten
+                    </a>
+                    
+                    {% if rol == 'admin' %}
+                    <a href="/angajati" class="bg-amber-500 hover:bg-amber-400 text-black font-bold px-4 py-2.5 rounded-xl transition flex items-center gap-2 text-sm shadow-lg shadow-amber-500/20">
+                        <i class="fa-solid fa-users"></i> Mitarbeiter
+                    </a>
+                    {% endif %}
+                </div>
+            </div>
+            
+            {% if session.get('rol') == 'admin' %}
+            <!-- BARA DE CĂUTARE LIVE -->
+            <div class="relative w-full md:w-96">
+                <i class="fa-solid fa-search absolute left-4 top-3.5 text-gray-500"></i>
+                <input type="text" id="searchInput" onkeyup="cautaFacturi()" class="input-field pl-12 bg-gray-900 border-gray-700 focus:border-primary" placeholder="Suche (z.B. Kunde, Produkt, Menge)...">
+            </div>
+            {% endif %}
+        </div> <!-- Aici se închide corect containerul de sus, indiferent de rol -->
+
+        {% if session.get('rol') == 'admin' %}
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-12">
+            <!-- VERKAUF ERFASSEN -->
+            <section class="bg-surface rounded-3xl p-8 border border-gray-800 shadow-xl relative overflow-hidden">
+                <div class="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-primary to-transparent"></div>
+                <h2 class="text-xl font-bold text-white mb-6 flex items-center gap-2"><i class="fa-solid fa-file-invoice text-primary"></i> Verkauf erfassen</h2>
+                <form action="/genereaza" method="POST" class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div class="sm:col-span-2">
+                        <label class="block text-xs font-medium text-gray-400 mb-1">Kundenname</label>
+                        <input type="text" name="client" required class="input-field" placeholder="Z. B. Max Mustermann">
+                    </div>
+                    <div class="sm:col-span-2">
+                        <label class="block text-xs font-medium text-gray-400 mb-1">Produkt / Dienstleistung</label>
+                        <input type="text" name="produs" required class="input-field" placeholder="Was wurde verkauft?">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-medium text-gray-400 mb-1">Preis (EUR)</label>
+                        <input type="number" step="0.01" name="pret" required class="input-field" placeholder="0.00">
+                    </div>
+                    <div>
+                        <div class="flex justify-between items-center mb-1">
+                            <label class="block text-xs font-medium text-gray-400">Datum und Uhrzeit</label>
+                            <button type="button" onclick="seteazaOraCurenta('data_factura')" class="text-[11px] bg-primary/10 text-primary hover:bg-primary hover:text-black px-2 py-0.5 rounded transition flex items-center gap-1 border border-primary/20"><i class="fa-solid fa-clock"></i> Aktuelle Zeit</button>
+                        </div>
+                        <input type="text" id="data_factura" name="data_ora" required class="input-field date-auto-fill" placeholder="Datum wählen...">
+                    </div>
+                    <div class="sm:col-span-2 mt-2">
+                        <button type="submit" class="w-full bg-primary/10 border border-primary/30 hover:bg-primary hover:text-black text-primary font-bold py-3 rounded-xl transition flex items-center justify-center gap-2"><i class="fa-solid fa-plus"></i> Rechnung erstellen</button>
+                    </div>
+                </form>
+            </section>
+
+            <!-- BELEG & BESTAND HINZUFÜGEN -->
+            <section class="bg-surface rounded-3xl p-8 border border-gray-800 shadow-xl relative overflow-hidden">
+                <div class="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-red-500 to-transparent"></div>
+                <h2 class="text-xl font-bold text-white mb-6 flex items-center gap-2"><i class="fa-solid fa-boxes-stacked text-red-400"></i> Einkauf & Bestand hinzufügen</h2>
+                <form action="/adauga_plata" method="POST" class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div class="sm:col-span-2">
+                        <label class="block text-xs font-medium text-gray-400 mb-1">Anbieter / Geschäft</label>
+                        <input type="text" name="furnizor" required class="input-field focus:border-red-500" placeholder="Z. B. Bauhaus, Rewe">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-medium text-gray-400 mb-1">Details (Was?)</label>
+                        <input type="text" name="descriere" required class="input-field focus:border-red-500" placeholder="Z. B. 500L Flaschen">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-medium text-gray-400 mb-1">Menge / Stückzahl</label>
+                        <input type="number" name="cantitate" required class="input-field focus:border-red-500" placeholder="Z. B. 500" value="1">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-medium text-gray-400 mb-1">Gesamtbetrag (EUR)</label>
+                        <input type="number" step="0.01" name="suma" required class="input-field focus:border-red-500" placeholder="0.00">
+                    </div>
+                    <div>
+                        <div class="flex justify-between items-center mb-1">
+                            <label class="block text-xs font-medium text-gray-400">Datum</label>
+                            <button type="button" onclick="seteazaOraCurenta('data_plata')" class="text-[11px] bg-red-500/10 text-red-400 hover:bg-red-500 hover:text-white px-2 py-0.5 rounded transition flex items-center gap-1 border border-red-500/20"><i class="fa-solid fa-clock"></i> Aktuelle Zeit</button>
+                        </div>
+                        <input type="text" id="data_plata" name="data_ora" required class="input-field focus:border-red-500 date-auto-fill" placeholder="Datum wählen...">
+                    </div>
+                    <div class="sm:col-span-2 mt-2">
+                        <button type="submit" class="w-full bg-red-500/10 border border-red-500/30 hover:bg-red-500 hover:text-white text-red-400 font-bold py-3 rounded-xl transition flex items-center justify-center gap-2"><i class="fa-solid fa-file-invoice-dollar"></i> Im System speichern</button>
+                    </div>
+                </form>
+            </section>
+        </div>
+
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+            <div class="lg:col-span-2 space-y-8 searchable-container">
+                <!-- AUSSTEHENDE VERKÄUFE -->
+                <div>
+                    <h2 class="text-xl font-bold text-white mb-4 flex items-center gap-2"><i class="fa-solid fa-hourglass-half text-orange-400"></i> Ausstehende Verkäufe</h2>
+                    <div class="bg-surface rounded-2xl border border-gray-800 overflow-hidden">
+                        <div class="overflow-x-auto">
+                            <table class="w-full text-left border-collapse">
+                                <thead>
+                                    <tr class="bg-[#141620] border-b border-gray-800">
+                                        <th class="py-3 px-4 text-xs font-medium text-gray-400"># ID</th>
+                                        <th class="py-3 px-4 text-xs font-medium text-gray-400">Kunde</th>
+                                        <th class="py-3 px-4 text-xs font-medium text-gray-400">Produkt</th>
+                                        <th class="py-3 px-4 text-xs font-medium text-gray-400">Aktion</th>
+                                    </tr>
+                                </thead>
+                                <tbody class="divide-y divide-gray-800/50 searchable-row">
+                                    {% for comanda in comenzi_active %}
+                                    <tr class="hover:bg-gray-800/30 transition">
+                                        <td class="py-3 px-4 text-primary font-bold">#{{ comanda[0] }}</td>
+                                        <td class="py-3 px-4 text-gray-200">{{ comanda[1] }}</td>
+                                        <td class="py-3 px-4 text-gray-400 text-sm">{{ comanda[2] }}</td>
+                                        <td class="py-3 px-4 flex items-center gap-2">
+                                            <a href="/marcheaza_vandut/{{ comanda[0] }}" class="bg-emerald-500/10 hover:bg-emerald-500 text-emerald-400 hover:text-white px-3 py-1.5 rounded transition text-xs font-medium"><i class="fa-solid fa-check"></i> Bezahlt</a>
+                                        </td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- BESTAND & EINKÄUFE -->
+                <div>
+                    <h2 class="text-xl font-bold text-white mb-4 flex items-center gap-2"><i class="fa-solid fa-layer-group text-red-400"></i> Alle Ausgaben & Bestand (Lager)</h2>
+                    <div class="bg-surface rounded-2xl border border-gray-800 overflow-hidden">
+                        <div class="overflow-x-auto">
+                            <table class="w-full text-left border-collapse">
+                                <thead>
+                                    <tr class="bg-[#141620] border-b border-gray-800">
+                                        <th class="py-3 px-4 text-xs font-medium text-gray-400">Anbieter / Details</th>
+                                        <th class="py-3 px-4 text-xs font-medium text-gray-400">Bestand (Verbleibend)</th>
+                                        <th class="py-3 px-4 text-xs font-medium text-gray-400">Status</th>
+                                        <th class="py-3 px-4 text-xs font-medium text-gray-400">Bestand reduzieren</th>
+                                    </tr>
+                                </thead>
+                                <tbody class="divide-y divide-gray-800/50 searchable-row">
+                                    {% for plata in toate_achizitiile %}
+                                    <tr class="hover:bg-gray-800/30 transition">
+                                        <td class="py-3 px-4">
+                                            <div class="text-gray-200">{{ plata[1] }}</div>
+                                            <div class="text-gray-500 text-xs">{{ plata[2] }}</div>
+                                        </td>
+                                        <td class="py-3 px-4">
+                                            {% if plata[7] <= (plata[6] * 0.2) %}
+                                                <span class="text-red-500 font-bold" title="Niedriger Bestand!">{{ plata[7] }} / {{ plata[6] }}</span>
+                                            {% else %}
+                                                <span class="text-emerald-400 font-bold">{{ plata[7] }} / {{ plata[6] }}</span>
+                                            {% endif %}
+                                        </td>
+                                        <td class="py-3 px-4">
+                                            {% if plata[5] == 'neplatit' %}
+                                                <a href="/marcheaza_platit/{{ plata[0] }}" class="text-[10px] bg-red-900/30 text-red-400 border border-red-500/30 px-2 py-1 rounded hover:bg-red-500 hover:text-white transition">Offen - Bezahlen?</a>
+                                            {% else %}
+                                                <span class="text-[10px] bg-emerald-900/30 text-emerald-400 border border-emerald-500/30 px-2 py-1 rounded">Bezahlt</span>
+                                            {% endif %}
+                                        </td>
+                                        <td class="py-3 px-4">
+                                            <form action="/scade_stoc" method="POST" class="flex gap-2">
+                                                <input type="hidden" name="id_plata" value="{{ plata[0] }}">
+                                                <input type="number" name="cantitate_consumata" required min="1" max="{{ plata[7] }}" class="input-field py-1 px-2 text-xs w-20" placeholder="Menge">
+                                                <button type="submit" class="bg-gray-700 hover:bg-gray-600 text-white px-2 py-1 rounded text-xs transition"><i class="fa-solid fa-minus"></i></button>
+                                            </form>
+                                        </td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- BILANZ GRAFIK -->
+            <div class="flex flex-col">
+                <h2 class="text-xl font-bold text-white mb-4 flex items-center gap-2"><i class="fa-solid fa-scale-balanced text-primary"></i> Bilanz</h2>
+                <div class="bg-surface rounded-3xl border border-gray-800 shadow-xl p-8 flex-1 flex flex-col items-center">
+                    <div class="relative w-full h-64 flex justify-center items-center"><canvas id="graficBalanță"></canvas></div>
+                    <div class="mt-8 w-full space-y-3">
+                        <div class="flex justify-between items-center bg-gray-800/50 px-4 py-2 rounded-lg border border-gray-700">
+                            <span class="text-sm text-gray-400">Gesamteinnahmen</span>
+                            <span class="text-emerald-400 font-bold">{{ total_incasat }} EUR</span>
+                        </div>
+                        <div class="flex justify-between items-center bg-red-900/20 px-4 py-2 rounded-lg border border-red-500/20">
+                            <span class="text-sm text-gray-400">Gesamtausgaben</span>
+                            <span class="text-red-400 font-bold">{{ total_de_plata }} EUR</span>
+                        </div>
+                        <div class="pt-3 border-t border-gray-800 mt-2">
+                            <div class="flex justify-between items-center bg-blue-900/10 px-4 py-3 rounded-xl border border-blue-500/20">
+                                <span class="text-sm text-gray-300 font-bold">Aktueller Stand (Netto)</span>
+                                {% set profit = total_incasat - total_de_plata %}
+                                <span class="{% if profit > 0 %}text-emerald-400{% elif profit < 0 %}text-red-400{% else %}text-blue-400{% endif %} font-extrabold text-lg">
+                                    {% if profit > 0 %}+{% endif %}{{ profit | round(2) }} EUR
+                                </span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        {% endif %}
+    </main>
+
+    <style>
+        #chat-toggle { position: fixed; bottom: 20px; right: 20px; background-color: #007bff; color: white; border: none; border-radius: 50px; padding: 12px 20px; font-size: 16px; cursor: pointer; box-shadow: 0 4px 6px rgba(0,0,0,0.1); z-index: 1000; font-family: Arial, sans-serif; }
+        #chat-window { position: fixed; bottom: 70px; right: 20px; width: 330px; height: 420px; background: white; border-radius: 10px; box-shadow: 0 5px 15px rgba(0,0,0,0.2); display: flex; flex-direction: column; z-index: 1000; border: 1px solid #ddd; font-family: Arial, sans-serif; }
+        #chat-header { background: #007bff; color: white; padding: 10px; border-radius: 10px 10px 0 0; display: flex; justify-content: space-between; align-items: center; font-weight: bold; }
+        #chat-header button { background: none; border: none; color: white; font-size: 16px; cursor: pointer; }
+        #chat-messages { flex: 1; padding: 10px; overflow-y: auto; font-size: 13px; background: #f9f9f9; }
+        .msg { margin-bottom: 10px; padding: 8px; border-radius: 5px; color: #333; }
+        .user-msg { background: #d1ecf1; text-align: right; margin-left: 20px; }
+        .bot-msg { background: #e2e3e5; text-align: left; margin-right: 20px; }
+        #chat-input-area { display: flex; padding: 10px; border-top: 1px solid #ddd; background: white; border-radius: 0 0 10px 10px; }
+        #chat-input { flex: 1; padding: 8px; border: 1px solid #ccc; border-radius: 5px; margin-right: 5px; color: #333; }
+        #chat-input-area button { padding: 8px 12px; background: #28a745; color: white; border: none; border-radius: 5px; cursor: pointer; }
+    </style>
+
+    <button id="chat-toggle" onclick="toggleChat()">💬 Lager-Assistent</button>
+
+    <div id="chat-window" style="display: none;">
+        <div id="chat-header">
+            <span>🤖 Finanz & Inventar Bot</span>
+            <button onclick="toggleChat()">✖</button>
+        </div>
+        <div id="chat-messages">
+            <div class="msg bot-msg"><strong>Bot:</strong> Hallo! Frag mich nach Beständen (z.B. "Riesling Flaschen") oder Rechnungen.</div>
+        </div>
+        <div id="chat-input-area">
+            <input type="text" id="chat-input" placeholder="Nachricht schreiben..." onkeypress="handleKeyPress(event)">
+            <button onclick="trimiteMesaj()">Senden</button>
+        </div>
+    </div>
+
+    <script>
+        let calendarInstances = [];
+        document.addEventListener("DOMContentLoaded", function() {
+            calendarInstances = flatpickr(".date-auto-fill", { enableTime: true, dateFormat: "Y-m-d\\TH:i", time_24hr: true, locale: "de", defaultDate: new Date() });
+
+            // Aici era problema pentru angajați: Graficul căuta un element ascuns.
+            const canvasElement = document.getElementById('graficBalanță');
+            if(canvasElement) {
+                const ctx = canvasElement.getContext('2d');
+                new Chart(ctx, {
+                    type: 'doughnut', data: { labels: ['Eingenommen', 'Zu Zahlen'], datasets: [{ data: [{{ total_incasat | default(0) }}, {{ total_de_plata | default(0) }}], backgroundColor: ['#10B981', '#EF4444'], borderColor: '#1A1D27', borderWidth: 4 }] },
+                    options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom', labels: { color: '#9CA3AF' } } } }
+                });
+            }
+        });
+
+        function seteazaOraCurenta(inputId) {
+            const now = new Date();
+            calendarInstances.forEach(inst => { if(inst.element.id === inputId) inst.setDate(now); });
+        }
+
+        function cautaFacturi() {
+            let filter = document.getElementById("searchInput").value.toLowerCase();
+            let rows = document.querySelectorAll(".searchable-row tr");
+            rows.forEach(row => {
+                let text = row.innerText.toLowerCase();
+                row.style.display = text.includes(filter) ? "" : "none";
+            });
+        }
+
+        function toggleChat() {
+            const chat = document.getElementById('chat-window');
+            chat.style.display = chat.style.display === 'none' ? 'flex' : 'none';
+        }
+
+        function handleKeyPress(event) {
+            if (event.key === 'Enter') trimiteMesaj();
+        }
+
+        async function trimiteMesaj() {
+            const inputField = document.getElementById('chat-input');
+            const mesaj = inputField.value.trim();
+            if (!mesaj) return;
+
+            adaugaMesajInChat('Du', mesaj, 'user-msg');
+            inputField.value = '';
+
+            try {
+                const response = await fetch('/chat', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ mesaj: mesaj })
+                });
+
+                const data = await response.json();
+                adaugaMesajInChat('Bot', data.raspuns, 'bot-msg');
+
+                if(data.raspuns.includes("abgezogen")) {
+                     setTimeout(() => location.reload(), 2500);
+                }
+            } catch (error) {
+                adaugaMesajInChat('Fehler', 'Verbindung zum Server fehlgeschlagen.', 'bot-msg');
+            }
+        }
+
+        function adaugaMesajInChat(expeditor, text, clasa) {
+            const messagesDiv = document.getElementById('chat-messages');
+            messagesDiv.innerHTML += `<div class="msg ${clasa}"><strong>${expeditor}:</strong> ${text}</div>`;
+            messagesDiv.scrollTop = messagesDiv.scrollHeight;
+        }
+    </script>
+</body>
+</html>
