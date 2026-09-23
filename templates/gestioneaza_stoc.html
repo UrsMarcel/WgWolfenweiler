@@ -1,0 +1,252 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Lagerverwaltung</title>
+    <script src="https://unpkg.com/html5-qrcode" type="text/javascript"></script>
+    <style>
+        body { font-family: Arial, sans-serif; background-color: #f4f6f9; margin: 0; padding: 15px; }
+        h1 { font-size: 20px; color: #333; text-align: center; }
+        .form-card { background: white; padding: 15px; margin-bottom: 15px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        label { display: block; margin-top: 10px; font-weight: bold; font-size: 14px; }
+        input[type="text"], input[type="number"], input[type="date"] { width: 100%; padding: 10px; margin-top: 5px; box-sizing: border-box; font-size: 16px; border: 1px solid #ccc; border-radius: 4px; }
+        .btn { display: block; width: 100%; padding: 12px; margin-top: 15px; background-color: #28a745; color: white; font-size: 16px; font-weight: bold; border: none; border-radius: 5px; cursor: pointer; text-align: center; }
+        .btn-scan { background-color: #007bff; color: white; padding: 10px; border: none; border-radius: 4px; cursor: pointer; font-size: 14px; font-weight: bold; white-space: nowrap;}
+        .btn-back { background-color: #6c757d; margin-top: 10px; text-decoration: none; display: block; text-align: center; color: white; padding: 12px; border-radius: 5px; font-weight: bold; }
+        .item-list { font-size: 14px; border-bottom: 1px solid #eee; padding-bottom: 15px; margin-bottom: 15px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px; }
+        .item-info { flex: 1; min-width: 250px; }
+        .item-stats { background: #f8f9fa; padding: 10px 15px; border-radius: 8px; border: 1px solid #e9ecef; min-width: 180px; text-align: right; }
+        #reader { width: 100%; max-width: 400px; margin: 10px auto; display: none; border-radius: 8px; overflow: hidden; border: 2px solid #007bff; }
+        .flex-row { display: flex; gap: 10px; align-items: flex-end; margin-top: 5px; }
+        .flex-row input { margin-top: 0; }
+        .search-box { width: 100%; padding: 12px; font-size: 16px; border: 2px solid #007bff; border-radius: 6px; margin-bottom: 15px; box-sizing: border-box; }
+        
+        .inv-btn { padding: 10px 20px; font-size: 20px; font-weight: bold; background: #e2e8f0; border: none; border-radius: 5px; cursor: pointer; }
+        .inv-btn:hover { background: #cbd5e1; }
+    </style>
+</head>
+<body>
+
+    {% if session.get('rol') == 'admin' %}
+    
+    <!-- MODUL INVENTAR RAPID -->
+    <div class="form-card" style="border: 2px solid #10B981; background: #ecfdf5;">
+        <h2 style="color: #065f46; margin-top:0; margin-bottom: 5px;">📦 Live Inventar-Modus</h2>
+        <p style="font-size: 13px; color: #047857; margin-bottom: 15px;">Scanne einen Karton oder eine Flasche, um den Bestand sofort zu prüfen und zu ändern.</p>
+        
+        <button class="btn" style="background-color: #10B981; margin-top: 0;" onclick="startScanner('inventar')">📷 Bestand scannen</button>
+        
+        <div id="rezultat-inventar" style="display:none; margin-top: 15px; padding: 15px; background: white; border-radius: 8px; border: 1px solid #a7f3d0; box-shadow: 0 4px 6px rgba(0,0,0,0.05);">
+             <h3 id="inv-nume" style="margin-top:0; color: #1e293b; margin-bottom: 5px;"></h3>
+             <p style="font-size: 12px; color: #64748b; margin-bottom: 15px; line-height: 1.5;">
+                 📍 Ort: <strong id="inv-locatie" style="color: #3b82f6;"></strong><br>
+                 Flasche: <span id="inv-ean-sticla"></span><br>
+                 Karton: <span id="inv-ean-carton"></span>
+             </p>
+             
+             <label style="color: #334155; margin-bottom: 5px;">Aktueller Bestand (Flaschen):</label>
+             <div style="display:flex; align-items:center; gap: 10px;">
+                 <button type="button" class="inv-btn" onclick="modificaCantitate(-1)">-</button>
+                 <input type="number" id="inv-cantitate" style="flex:1; text-align:center; font-weight:bold; font-size:22px; margin: 0; padding: 8px; border: 2px solid #cbd5e1;">
+                 <button type="button" class="inv-btn" onclick="modificaCantitate(1)">+</button>
+             </div>
+             
+             <button class="btn" style="background-color: #3b82f6; margin-top: 15px;" onclick="salveazaInventar()">💾 Bestand Speichern</button>
+        </div>
+    </div>
+
+    <h1>Neues Produkt / Bestand hinzufügen</h1>
+    <div class="form-card">
+        <form method="POST">
+            <label>Barcode FLASCHE (Primär):</label>
+            <div class="flex-row">
+                <input type="text" id="cod_bare_input" name="cod_bare" required placeholder="z.B. 40123456789">
+                <button type="button" class="btn-scan" onclick="startScanner('add_sticla')">📷 Scan</button>
+            </div>
+            
+            <label>Barcode KARTON (Optional):</label>
+            <div class="flex-row">
+                <input type="text" id="cod_bare_carton_input" name="cod_bare_carton" placeholder="z.B. 4005708201373">
+                <button type="button" class="btn-scan" onclick="startScanner('add_carton')">📷 Scan</button>
+            </div>
+
+            <label>Produktname (z.B. Riesling Kabinett):</label>
+            <input type="text" name="denumire_produs" required placeholder="Name des Weins">
+
+            <label>Sorte (riesling, merlot, etc.):</label>
+            <input type="text" name="soi" required placeholder="Soi">
+
+            <div class="flex-row">
+                <div style="flex: 1;">
+                    <label style="color: #007bff;">📦 Anzahl Kartons:</label>
+                    <input type="number" id="input_cartoane" required placeholder="z.B. 100" min="0" oninput="calculeazaTotal()">
+                </div>
+                <div style="flex: 1;">
+                    <label style="color: #F59E0B;">🍾 Flaschen / Karton:</label>
+                    <input type="number" id="input_per_carton" required placeholder="z.B. 6" min="1" value="6" oninput="calculeazaTotal()">
+                </div>
+            </div>
+
+            <label>Gesamtbestand (Flaschen - wird automatisch berechnet):</label>
+            <input type="number" name="cantitate" id="input_total" required readonly style="background-color: #e9ecef; font-weight: bold; color: #28a745;">
+
+            <label>Lagerort (z.B. Regal A4):</label>
+            <input type="text" name="locatie" required placeholder="Raft / Locație">
+
+            <label>Letzte Abfüllung (Datum):</label>
+            <input type="date" name="ultima_imbuteliere" required>
+
+            <button type="submit" class="btn">Speichern / Aktualisieren</button>
+        </form>
+    </div>
+    {% endif %}
+    
+    <!-- Divul folosit de scanner (comun pentru toate modurile) -->
+    <div id="reader"></div>
+
+    <h1>Lagerbestand Suchen (Ort & Menge)</h1>
+    <div class="form-card">
+        <input type="text" id="cauta_stoc" class="search-box" placeholder="🔍 Suchen (z.B. Riesling, Regal 3)..." onkeyup="filtreazaStoc()">
+
+        <div id="lista_stocuri">
+            {% for p in produse %}
+            <div class="item-list stoc-item">
+                <div class="item-info">
+                    <strong>{{ p[2] }}</strong><br>
+                    <span style="font-size: 12px; color: #6c757d;">
+                        Flasche EAN: {{ p[1] }}<br>
+                        Karton EAN: {{ p[6] if p[6] else 'Nicht gesetzt' }}
+                    </span><br>
+                    Menge: <strong style="color:#28a745; font-size:16px;">{{ p[3] }} Flaschen</strong> | Ort: <strong style="color:#007bff; font-size:16px;">{{ p[4] }}</strong><br>
+                    <span style="font-size: 12px; color: #6c757d;">Abgefüllt am: {{ p[5] }}</span>
+                </div>
+
+                <div class="item-stats">
+                    <strong style="color: #495057; font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px;">Gescannt von:</strong><br>
+                    {% if p[1] in vanzari_pe_produs %}
+                        {% for v in vanzari_pe_produs[p[1]] %}
+                            <div style="font-size: 14px; margin-top: 5px; border-bottom: 1px dotted #dee2e6; padding-bottom: 3px;">
+                                <span style="color: #d97706; font-weight: bold;">🧑‍💼 {{ v.angajat }}</span> 
+                                <span style="color: #dc3545; font-weight: bold; float: right;">-{{ v.total }} Fl.</span>
+                            </div>
+                        {% endfor %}
+                    {% else %}
+                        <div style="font-size: 13px; color: #adb5bd; margin-top: 5px; font-style: italic;">Noch nicht gescannt</div>
+                    {% endif %}
+                </div>
+            </div>
+            {% else %}
+            <p style="text-align: center; color: #6c757d; margin-top: 20px;">Keine Produkte im Lager gefunden.</p>
+            {% endfor %}
+        </div>
+    </div>
+
+    <a href="/index" class="btn-back">Zurück zum Dashboard</a>
+
+    <script>
+        let html5QrCode;
+        let eanCurentInventar = "";
+
+        function startScanner(mod) {
+            document.getElementById('reader').style.display = 'block';
+            
+            if(html5QrCode) {
+                html5QrCode.stop().then(() => initScan(mod)).catch(() => initScan(mod));
+            } else {
+                initScan(mod);
+            }
+        }
+
+        function initScan(mod) {
+            html5QrCode = new Html5Qrcode("reader");
+            html5QrCode.start(
+                { facingMode: "environment" },
+                { fps: 10, qrbox: { width: 250, height: 150 } },
+                (decodedText) => {
+                    html5QrCode.stop().then(() => {
+                        document.getElementById('reader').style.display = 'none';
+                        
+                        if (mod === 'add_sticla') {
+                            document.getElementById('cod_bare_input').value = decodedText;
+                        } else if (mod === 'add_carton') {
+                            document.getElementById('cod_bare_carton_input').value = decodedText;
+                        } else if (mod === 'inventar') {
+                            proceseazaInventar(decodedText);
+                        }
+                    });
+                },
+                (errorMessage) => {}
+            ).catch((err) => {
+                alert("Kamera-Zugriff verweigert oder nicht verfügbar.");
+                document.getElementById('reader').style.display = 'none';
+            });
+        }
+
+        function proceseazaInventar(codScanat) {
+            fetch('/api/info_stoc', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ cod_bare: codScanat })
+            })
+            .then(res => res.json())
+            .then(data => {
+                if(data.status === 'gasit') {
+                    document.getElementById('rezultat-inventar').style.display = 'block';
+                    document.getElementById('inv-nume').innerText = data.denumire;
+                    document.getElementById('inv-locatie').innerText = data.locatie;
+                    document.getElementById('inv-ean-sticla').innerText = data.cod_bare;
+                    document.getElementById('inv-ean-carton').innerText = data.cod_bare_carton || "Fehlt";
+                    document.getElementById('inv-cantitate').value = data.cantitate;
+                    eanCurentInventar = data.cod_bare; // Salvăm codul primar pentru update
+                } else {
+                    alert("⚠️ Produkt nicht im System gefunden! Bitte fügen Sie es unten als neues Produkt hinzu.");
+                }
+            })
+            .catch(() => alert("Netzwerkfehler!"));
+        }
+
+        function modificaCantitate(valoare) {
+            let input = document.getElementById('inv-cantitate');
+            let cant = parseInt(input.value) || 0;
+            input.value = Math.max(0, cant + valoare);
+        }
+
+        function salveazaInventar() {
+            let cant = document.getElementById('inv-cantitate').value;
+            fetch('/api/update_stoc_rapid', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ cod_bare: eanCurentInventar, cantitate: cant })
+            })
+            .then(res => res.json())
+            .then(data => {
+                if(data.status === 'succes') {
+                    alert("✅ Bestand erfolgreich aktualisiert!");
+                    document.getElementById('rezultat-inventar').style.display = 'none';
+                    location.reload(); // Reîncărcăm pagina pentru a vedea lista actualizată
+                } else {
+                    alert("❌ Fehler: " + data.mesaj);
+                }
+            });
+        }
+
+        function filtreazaStoc() {
+            let filter = document.getElementById("cauta_stoc").value.toLowerCase();
+            let items = document.querySelectorAll(".stoc-item");
+
+            items.forEach(item => {
+                let text = item.innerText.toLowerCase();
+                item.style.display = text.includes(filter) ? "flex" : "none";
+            });
+        }
+
+        function calculeazaTotal() {
+            let cartoane = parseInt(document.getElementById('input_cartoane').value) || 0;
+            let perCarton = parseInt(document.getElementById('input_per_carton').value) || 0;
+            let total = cartoane * perCarton;
+            document.getElementById('input_total').value = total;
+        }
+    </script>
+</body>
+</html>
