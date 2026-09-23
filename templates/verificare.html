@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="de" class="scroll-smooth">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>System Verifizierung - Protokoll</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script>
+        tailwind.config = { darkMode: 'class', theme: { extend: { colors: { background: '#0F111A', surface: '#1A1D27', primary: '#60A5FA', success: '#10B981' } } } }
+    </script>
+    <style>
+        body { background-color: #0F111A; color: #F3F4F6; }
+        .glass-nav { background: rgba(26, 29, 39, 0.85); backdrop-filter: blur(12px); border-bottom: 1px solid rgba(255,255,255,0.05); }
+        ::-webkit-scrollbar { height: 8px; width: 8px; }
+        ::-webkit-scrollbar-track { background: #0F111A; }
+        ::-webkit-scrollbar-thumb { background: #374151; border-radius: 4px; }
+    </style>
+</head>
+<body class="antialiased relative min-h-screen flex flex-col">
+
+    <nav class="glass-nav fixed w-full z-40">
+        <div class="max-w-7xl mx-auto px-6 h-20 flex items-center justify-between">
+            <div class="flex items-center gap-3 font-bold text-2xl tracking-tight">
+                <i class="fa-solid fa-shield-halved text-primary"></i> <span>System<span class="text-primary">Verifizierung</span></span>
+            </div>
+            <div class="flex items-center gap-4 text-sm font-medium">
+                <a href="/index" class="bg-gray-800 hover:bg-gray-700 text-white px-4 py-2 rounded-lg transition flex items-center gap-2">
+                    <i class="fa-solid fa-arrow-left"></i> Dashboard
+                </a>
+            </div>
+        </div>
+    </nav>
+
+    <main class="flex-1 pt-32 pb-12 px-6 max-w-5xl mx-auto w-full">
+        <div class="mb-8">
+            <h1 class="text-3xl font-extrabold tracking-tight mb-2">Zugriffs-Protokoll</h1>
+            <p class="text-gray-400">Übersicht aller Seitenaufrufe, Zeiten und IP-Adressen im System.</p>
+        </div>
+
+        <div class="bg-surface rounded-2xl border border-gray-800 overflow-hidden shadow-xl">
+            <div class="overflow-x-auto">
+                <table class="w-full text-left border-collapse">
+                    <thead>
+                        <tr class="bg-[#141620] border-b border-gray-800">
+                            <th class="py-3 px-5 text-xs font-medium text-gray-400">Datum & Uhrzeit</th>
+                            <th class="py-3 px-5 text-xs font-medium text-gray-400">Benutzer</th>
+                            <th class="py-3 px-5 text-xs font-medium text-gray-400">IP-Adresse</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-gray-800/50">
+                        {% for log in logs %}
+                        <tr class="hover:bg-gray-800/30 transition">
+                            <td class="py-3 px-5 text-gray-300 text-sm"><i class="fa-regular fa-clock text-primary mr-2"></i> {{ log[2] }}</td>
+                            <td class="py-3 px-5 text-orange-400 font-bold"><i class="fa-solid fa-user text-xs mr-1"></i> {{ log[0] }}</td>
+                            <td class="py-3 px-5 text-emerald-400 font-mono text-sm">{{ log[1] }}</td>
+                        </tr>
+                        {% else %}
+                        <tr>
+                            <td colspan="3" class="py-8 text-center text-sm text-gray-500">Keine Protokolle vorhanden.</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </main>
+
+</body>
+</html>
