@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mitarbeiter verwalten</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        body { font-family: Arial, sans-serif; background-color: #0F111A; color: white; padding: 20px; }
+        h2 { color: #F59E0B; font-size: 20px; margin-bottom: 10px; }
+        input, select { width: 100%; padding: 12px; margin: 8px 0; background: #1A1D27; border: 1px solid #374151; color: white; border-radius: 8px; box-sizing: border-box; }
+        .btn { width: 100%; padding: 14px; background: #F59E0B; color: black; font-weight: bold; border: none; border-radius: 8px; margin-top: 10px; cursor: pointer; }
+        .card { background: #1A1D27; padding: 15px; border-radius: 10px; margin-bottom: 15px; border: 1px solid #374151; cursor: pointer; transition: 0.2s; }
+        .card:hover { border-color: #F59E0B; }
+        .back-link { display:block; text-align:center; color:#60A5FA; margin-top:20px; text-decoration:none; font-weight: bold; }
+        label { font-size: 14px; color: #9CA3AF; }
+        .details-box { display: none; margin-top: 15px; padding-top: 15px; border-top: 1px dashed #374151; cursor: default; }
+        .auftrag-badge { background: rgba(59, 130, 246, 0.2); color: #60A5FA; border: 1px solid rgba(59, 130, 246, 0.4); padding: 2px 6px; border-radius: 4px; font-size: 12px; font-weight: bold; }
+    </style>
+</head>
+<body>
+    <h2>👥 Neuen Mitarbeiter hinzufügen</h2>
+    <form method="POST" class="card" style="cursor: default;">
+        <label>Benutzername:</label>
+        <input type="text" name="username" required placeholder="z.B. alex.muller">
+
+        <label>Passwort:</label>
+        <input type="text" name="password" required placeholder="Passwort eingeben">
+
+        <label>Rolle:</label>
+        <select name="rol">
+            <option value="angajat">Lagerarbeiter (Nur Scanner & Bestand)</option>
+            <option value="admin">Administrator (Vollzugriff & Finanzen)</option>
+        </select>
+
+        <button type="submit" class="btn">Mitarbeiter speichern</button>
+    </form>
+
+    <h2>Aktuelle Mitarbeiter im System <span style="font-size: 13px; color: #9CA3AF; font-weight: normal;">(Klicke auf einen Mitarbeiter, um die Verkäufe anzuzeigen)</span></h2>
+    
+    {% for u in utilizatori %}
+    <div class="card" onclick="toggleDetails(this)">
+        <div style="display: flex; justify-content: space-between; align-items: center;">
+            <div>
+                👤 <strong>{{ u[1] }}</strong> <br>
+                Rolle: 
+                {% if u[2] == 'admin' %}
+                    <span style="color: #F59E0B; font-weight: bold;">Administrator</span>
+                {% else %}
+                    <span style="color: #10B981; font-weight: bold;">Lagerarbeiter</span>
+                {% endif %}
+            </div>
+            <div style="color: #9CA3AF; font-size: 14px;">
+                <i class="fa-solid fa-chevron-down"></i> Details anzeigen
+            </div>
+        </div>
+
+        <!-- Secțiunea care se deschide cu comenzile angajatului -->
+        <div class="details-box" onclick="event.stopPropagation()">
+            <h4 style="color: #60A5FA; margin: 0 0 10px 0; font-size: 14px;"><i class="fa-solid fa-box-archive"></i> Abgeschlossene Aufträge & Artikel:</h4>
+            
+            {% if u[1] in activitate_angajati %}
+                <table style="width: 100%; font-size: 13px; border-collapse: collapse; text-align: left;">
+                    <thead>
+                        <tr style="color: #9CA3AF; border-bottom: 1px solid #374151;">
+                            <th style="padding: 6px;">Auftrag</th>
+                            <th style="padding: 6px;">Produkt</th>
+                            <th style="padding: 6px; text-align: right;">Menge</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for item in activitate_angajati[u[1]] %}
+                        <tr style="border-bottom: 1px solid rgba(55, 65, 81, 0.4);">
+                            <td style="padding: 8px;"><span class="auftrag-badge">{{ item.auftrag }}</span></td>
+                            <td style="padding: 8px; color: #F3F4F6;">{{ item.produs }}</td>
+                            <td style="padding: 8px; text-align: right; color: #10B981; font-weight: bold;">-{{ item.cantitate }} Fl.</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            {% else %}
+                <p style="color: #9CA3AF; font-size: 13px; font-style: italic; margin: 0;">Keine Scans oder Aufträge von diesem Mitarbeiter aufgezeichnet.</p>
+            {% endif %}
+        </div>
+    </div>
+    {% else %}
+    <p style="color: #9CA3AF;">Keine anderen Mitarbeiter gefunden.</p>
+    {% endfor %}
+
+    <a href="/index" class="back-link">Zurück zum Dashboard</a>
+
+    <script>
+        function toggleDetails(cardElement) {
+            const detailsBox = cardElement.querySelector('.details-box');
+            const icon = cardElement.querySelector('.fa-chevron-down, .fa-chevron-up');
+            
+            if (detailsBox.style.display === 'block') {
+                detailsBox.style.display = 'none';
+                if(icon) { icon.className = "fa-solid fa-chevron-down"; }
+            } else {
+                detailsBox.style.display = 'block';
+                if(icon) { icon.className = "fa-solid fa-chevron-up"; }
+            }
+        }
+    </script>
+</body>
+</html>
