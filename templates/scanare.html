@@ -1,0 +1,488 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Scanner Pro - Finanzverwaltung</title>
+
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script src="https://unpkg.com/html5-qrcode" type="text/javascript"></script>
+
+    <script>
+        tailwind.config = {
+            theme: { extend: { colors: { background: '#0F111A', surface: '#1A1D27', primary: '#3b82f6', success: '#10B981', danger: '#EF4444' } } }
+        }
+    </script>
+
+    <style>
+        body { background-color: #0F111A; color: white; }
+        #reader { width: 100%; border: none; overflow: hidden; border-radius: 12px; background: #000; box-shadow: 0 4px 15px rgba(0,0,0,0.3); }
+        #reader video { object-fit: cover; border-radius: 12px; width: 100%; }
+        .scan-list::-webkit-scrollbar { width: 4px; }
+        .scan-list::-webkit-scrollbar-thumb { background: #374151; border-radius: 4px; }
+        @keyframes popIn { 0% { transform: scale(0.5); opacity: 0; } 80% { transform: scale(1.05); opacity: 1; } 100% { transform: scale(1); opacity: 1; } }
+        .anim-pop { animation: popIn 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards; }
+    </style>
+</head>
+<body class="min-h-screen flex flex-col relative">
+
+    <header class="bg-surface border-b border-gray-800 p-4 flex justify-between items-center sticky top-0 z-50 shadow-md">
+        <a href="/index" class="text-gray-400 hover:text-white transition"><i class="fa-solid fa-chevron-left text-xl"></i></a>
+        <div class="text-center">
+            <h1 class="text-lg font-bold tracking-wide">Scanner <span class="text-primary">PRO</span></h1>
+            <p id="top-status" class="text-xs text-orange-400 font-medium">1. Auftrag scannen/eingeben</p>
+        </div>
+        <button onclick="pornesteScanner()" id="btn-start-camera" class="text-primary hover:text-white transition"><i class="fa-solid fa-camera text-xl"></i></button>
+    </header>
+
+    <main class="flex-1 flex flex-col p-4 w-full max-w-lg mx-auto pb-12 z-10">
+
+        <!-- Input manual -->
+        <div class="flex gap-3 items-end bg-surface p-4 rounded-xl border border-gray-800 shadow-md mb-4">
+            <div class="flex-1">
+                <label id="label-manual" class="block text-xs font-medium text-gray-400 mb-1 ml-1 text-orange-400">Auftragsnummer manuell</label>
+                <div class="flex gap-2">
+                    <input type="text" id="manual-barcode" class="w-full bg-gray-900 border border-gray-700 text-white rounded-lg px-3 py-2 text-sm focus:border-primary outline-none" placeholder="Auftrag eingeben...">
+                    <button onclick="trimiteManual()" class="bg-gray-700 hover:bg-gray-600 px-4 rounded-lg text-white font-bold transition"><i class="fa-solid fa-paper-plane"></i></button>
+                </div>
+            </div>
+
+            <div id="div-menge" class="w-20 hidden">
+                <label class="block text-xs font-medium text-gray-400 mb-1 text-center">Menge</label>
+                <input type="number" id="menge-per-scan" value="6" min="1" class="w-full bg-gray-900 border border-success text-success rounded-lg px-2 py-2 text-xl font-bold text-center outline-none focus:border-primary">
+            </div>
+        </div>
+<!-- NOU: Opțiunea Scan Only -->
+            <div id="div-scan-only" class="hidden flex items-center justify-between pt-2 border-t border-gray-800">
+                <label for="check-scan-only" class="text-xs font-medium text-gray-300 flex items-center gap-2 cursor-pointer">
+                    <input type="checkbox" id="check-scan-only" class="w-4 h-4 accent-primary rounded cursor-pointer">
+                    <span>⚡ <strong>Scan Only</strong> (Turbo-Modus)</span>
+                </label>
+            </div>
+
+        <div id="auftrag-container" class="hidden bg-blue-900/30 border border-blue-500/30 rounded-xl p-3 mb-4 text-center anim-pop shadow-lg">
+            <span class="text-xs text-blue-300 uppercase font-bold tracking-wider">Aktueller Auftrag</span>
+            <h2 id="auftrag-display" class="text-2xl font-extrabold text-blue-400">A---</h2>
+        </div>
+
+        <div id="reader" class="w-full relative">
+            <div class="absolute inset-0 flex items-center justify-center pointer-events-none z-10" id="scan-overlay">
+                <i class="fa-solid fa-qrcode text-6xl text-gray-500/30"></i>
+            </div>
+        </div>
+
+        <div id="status-mesaj" class="min-h-[70px] mt-4 flex flex-col items-center justify-center text-center"></div>
+
+        <div id="scan-settings" class="hidden w-full space-y-4 mt-2">
+
+            <!-- Container lista PDF dinamica -->
+            <div id="pdf-container" class="bg-surface border border-gray-800 rounded-xl p-4 shadow-md">
+                <h3 class="text-xs text-gray-400 font-bold mb-3 uppercase tracking-wide border-b border-gray-700 pb-2">Zu scannende Artikel (PDF)</h3>
+                <div id="lista-necesar" class="space-y-2">
+                    <p class="text-sm text-gray-400" id="pdf-empty-msg">Warte auf Auftragsdaten...</p>
+                </div>
+            </div>
+
+            <div class="bg-surface border border-gray-800 rounded-xl p-4 shadow-md">
+                <h3 class="text-xs text-gray-400 font-bold mb-3 uppercase tracking-wide flex justify-between border-b border-gray-700 pb-2">
+                    <span>Erfasste Artikel</span>
+                    <span id="counter-sticle" class="text-success text-sm">0 Fl.</span>
+                </h3>
+                <ul id="lista-produse" class="text-sm space-y-3 max-h-[200px] overflow-y-auto scan-list pr-1"></ul>
+            </div>
+
+            <div class="flex gap-3">
+                <button onclick="anuleazaComanda()" class="w-1/3 bg-gray-800 border border-gray-700 hover:bg-red-600 hover:border-red-500 text-gray-300 font-bold py-3 rounded-xl text-xs uppercase tracking-wider shadow-lg transition active:scale-95 flex flex-col items-center justify-center gap-1">
+                    <i class="fa-solid fa-xmark text-xl"></i> Abbrechen
+                </button>
+                <button onclick="resetAuftrag()" id="btn-reset-auftrag" class="w-2/3 bg-blue-600 hover:bg-blue-500 text-white font-bold py-3 rounded-xl text-lg uppercase tracking-wider shadow-lg transition active:scale-95 flex items-center justify-center gap-2">
+                    <i class="fa-solid fa-check-double"></i> Abschließen
+                </button>
+            </div>
+        </div>
+    </main>
+
+    <script>
+        let audioCtx = null;
+        let totalSticleScazute = 0;
+        let isProcessing = false;
+
+        function initAudio() {
+            if (!audioCtx) {
+                const AudioContext = window.AudioContext || window.webkitAudioContext;
+                if (AudioContext) audioCtx = new AudioContext();
+            }
+            if (audioCtx && audioCtx.state === 'suspended') audioCtx.resume();
+        }
+
+        function triggerFeedback(type) {
+            try {
+                if (navigator.vibrate) {
+                    if (type === 'error' || type === 'delete') navigator.vibrate([200, 100, 200]);
+                    else navigator.vibrate([100]);
+                }
+                if (!audioCtx) return;
+                const oscillator = audioCtx.createOscillator();
+                const gainNode = audioCtx.createGain();
+                oscillator.connect(gainNode);
+                gainNode.connect(audioCtx.destination);
+                const now = audioCtx.currentTime;
+
+                if (type === 'auftrag') {
+                    oscillator.type = 'sine'; oscillator.frequency.setValueAtTime(523.25, now); oscillator.frequency.setValueAtTime(659.25, now + 0.1);
+                    gainNode.gain.setValueAtTime(0.5, now); gainNode.gain.exponentialRampToValueAtTime(0.01, now + 0.3);
+                    oscillator.start(now); oscillator.stop(now + 0.3);
+                } else if (type === 'produkt') {
+                    oscillator.type = 'square'; oscillator.frequency.setValueAtTime(800, now); oscillator.frequency.setValueAtTime(1200, now + 0.1);
+                    gainNode.gain.setValueAtTime(0.2, now); gainNode.gain.exponentialRampToValueAtTime(0.01, now + 0.2);
+                    oscillator.start(now); oscillator.stop(now + 0.2);
+                } else if (type === 'error' || type === 'delete') {
+                    oscillator.type = 'sawtooth'; oscillator.frequency.setValueAtTime(150, now);
+                    gainNode.gain.setValueAtTime(0.5, now); gainNode.gain.exponentialRampToValueAtTime(0.01, now + 0.4);
+                    oscillator.start(now); oscillator.stop(now + 0.4);
+                } else if (type === 'finish') {
+                    oscillator.type = 'triangle'; oscillator.frequency.setValueAtTime(523.25, now); oscillator.frequency.setValueAtTime(659.25, now + 0.1); oscillator.frequency.setValueAtTime(783.99, now + 0.2);
+                    gainNode.gain.setValueAtTime(0.5, now); gainNode.gain.exponentialRampToValueAtTime(0.01, now + 0.6);
+                    oscillator.start(now); oscillator.stop(now + 0.6);
+                }
+            } catch (e) {}
+        }
+
+        let codBareCurent = "";
+        let html5QrCode;
+        let modScanare = 'auftrag';
+        let auftragNummer = '';
+
+        function pornesteScanner() {
+            initAudio();
+            document.getElementById('btn-start-camera').style.display = 'none';
+            document.getElementById('scan-overlay').innerHTML = '';
+
+            let msgBox = document.getElementById('status-mesaj');
+            msgBox.innerHTML = '<div class="text-gray-400 text-sm"><i class="fa-solid fa-spinner fa-spin"></i> Kamera wird gestartet...</div>';
+
+            html5QrCode = new Html5Qrcode("reader");
+            const scanConfig = { fps: 15, qrbox: { width: 250, height: 180 } };
+
+            html5QrCode.start({ facingMode: "environment" }, scanConfig, (decodedText) => proceseazaCod(decodedText))
+            .then(() => { msgBox.innerHTML = ''; })
+            .catch(err => {
+                html5QrCode.start({ facingMode: "user" }, scanConfig, (decodedText) => proceseazaCod(decodedText))
+                .then(() => { msgBox.innerHTML = ''; })
+                .catch(err2 => {
+                    msgBox.innerHTML = '<div class="text-danger font-bold mt-2"><i class="fa-solid fa-camera-slash"></i> Zugriff auf Kamera verweigert.</div>';
+                    document.getElementById('btn-start-camera').style.display = 'block';
+                });
+            });
+        }
+
+        document.getElementById("manual-barcode").addEventListener("keypress", function(event) {
+            if (event.key === "Enter") {
+                event.preventDefault();
+                trimiteManual();
+            }
+        });
+
+        function trimiteManual() {
+            let input = document.getElementById('manual-barcode');
+            if (input.value.trim() !== "") {
+                proceseazaCod(input.value.trim());
+                input.value = "";
+            }
+        }
+
+        // Functia care incarca dinamic PDF-ul si recunoaste EAN-urile individuale
+        function incarcaFisierComanda(auftrag) {
+            let listaContainer = document.getElementById('lista-necesar');
+            listaContainer.innerHTML = '<div class="text-blue-400 text-sm py-2"><i class="fa-solid fa-circle-notch fa-spin"></i> Lade PDF-Daten aus dem System...</div>';
+
+            fetch('/api/get_comanda_pdf', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ auftrag: auftrag })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.status === 'gasit' && Object.keys(data.comanda).length > 0) {
+                    let htmlContent = '';
+                    for (const [cheie, detalii] of Object.entries(data.comanda)) {
+                        let classExtra = detalii.nume.includes("Naturalrabatt") ? "border-l-4 border-l-orange-500" : "";
+
+                        htmlContent += `
+                            <div id="req-${cheie}" data-ean="${detalii.ean}" data-necesar="${detalii.cantitate}" data-scanat="0" class="flex justify-between items-center bg-gray-900 p-3 rounded-lg border border-gray-700 transition-colors ${classExtra}">
+                                <div class="pr-2">
+                                    <span class="font-bold text-gray-200 text-sm block leading-tight">${detalii.nume}</span>
+                                    <span class="text-xs text-gray-500"><i class="fa-solid fa-barcode"></i> ${detalii.ean}</span>
+                                </div>
+                                <div class="text-xl font-bold text-white shrink-0">
+                                    <span id="count-${cheie}">0</span> <span class="text-sm text-gray-400 font-normal">/ ${detalii.cantitate}</span>
+                                </div>
+                            </div>`;
+                    }
+                    listaContainer.innerHTML = htmlContent;
+                } else {
+                    listaContainer.innerHTML = '<p class="text-sm text-red-400" id="pdf-empty-msg">Kein aktiver PDF-Auftrag gefunden.</p>';
+                }
+            })
+            .catch(err => {
+                listaContainer.innerHTML = '<p class="text-sm text-red-400" id="pdf-empty-msg">Serverfehler beim Laden der Daten.</p>';
+            });
+        }
+
+        function proceseazaCod(decodedText) {
+    if (isProcessing) return;
+    isProcessing = true;
+
+    let msgBox = document.getElementById('status-mesaj');
+    let textScanat = decodedText.trim();
+
+    if (modScanare === 'auftrag') {
+        triggerFeedback('auftrag');
+
+        if (textScanat.length === 7 && textScanat.startsWith('1')) {
+            textScanat = textScanat.substring(1);
+        }
+        auftragNummer = textScanat.toUpperCase().startsWith('A') ? textScanat : "A" + textScanat;
+
+        document.getElementById('top-status').innerText = "2. Artikel scannen/eingeben";
+        document.getElementById('top-status').className = "text-xs text-success font-medium";
+        document.getElementById('auftrag-display').innerText = auftragNummer;
+
+        document.getElementById('auftrag-container').classList.remove('hidden');
+        document.getElementById('scan-settings').classList.remove('hidden');
+        document.getElementById('div-scan-only').classList.remove('hidden');
+
+        document.getElementById('label-manual').innerText = "Barcode manuell";
+        document.getElementById('label-manual').className = "block text-xs font-medium text-gray-400 mb-1 ml-1";
+        document.getElementById('manual-barcode').placeholder = "z.B. 4012345...";
+        document.getElementById('div-menge').classList.remove('hidden');
+
+        msgBox.innerHTML = '<div class="text-success text-sm font-bold anim-pop"><i class="fa-solid fa-check-circle"></i> Auftrag erfasst!</div>';
+        modScanare = 'produkt';
+
+        incarcaFisierComanda(auftragNummer);
+
+        setTimeout(() => { msgBox.innerHTML = ''; isProcessing = false; }, 2000);
+
+    } else if (modScanare === 'produkt') {
+        let cantitateDeScazut = parseInt(document.getElementById('menge-per-scan').value) || 6;
+        msgBox.innerHTML = '<div class="text-gray-400 text-sm"><i class="fa-solid fa-circle-notch fa-spin"></i> Verarbeite Scan...</div>';
+
+        fetch('/api/scaneaza_cod', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ cod_bare: textScanat })
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.status === 'gasit') {
+                let numeProdus = data.denumire;
+                let eanPrimar = String(data.cod_bare_primar || textScanat).trim();
+
+                let existaListaPdf = document.getElementById('pdf-empty-msg') === null;
+                let toateRandurile = document.querySelectorAll('[id^="req-"]');
+                let reqDiv = null;
+                let idCheie = null;
+                let gasitOrice = false;
+
+                for (let rand of toateRandurile) {
+                    let eanRand = String(rand.getAttribute('data-ean')).trim();
+                    if (eanRand === eanPrimar || eanRand === textScanat) {
+                        gasitOrice = true;
+                        let sc = parseInt(rand.getAttribute('data-scanat')) || 0;
+                        let nec = parseInt(rand.getAttribute('data-necesar')) || 0;
+                        if (sc < nec) {
+                            reqDiv = rand;
+                            idCheie = rand.id.replace('req-', '');
+                            break;
+                        }
+                    }
+                }
+
+                if (existaListaPdf && !reqDiv) {
+                    triggerFeedback('error');
+                    if (gasitOrice) {
+                        msgBox.innerHTML = `<div class="anim-pop text-danger"><i class="fa-solid fa-circle-xmark text-4xl mb-1"></i><br>Menge überschreitet den Auftrag!</div>`;
+                    } else {
+                        msgBox.innerHTML = `<div class="anim-pop text-danger text-xs"><i class="fa-solid fa-circle-xmark text-4xl mb-1"></i><br>Scan: ${textScanat}<br>NICHT auf der Liste!</div>`;
+                    }
+                    setTimeout(() => { isProcessing = false; msgBox.innerHTML = '<div class="text-gray-500 text-xs">Bereit für nächsten Scan...</div>'; }, 3500);
+                    return;
+                }
+
+                fetch('/api/vinde_scaneaza', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ cod_bare: eanPrimar, cantitate: cantitateDeScazut, auftrag: auftragNummer })
+                })
+                .then(res => res.json())
+                .then(vindeData => {
+                    if (vindeData.status === 'succes') {
+                        triggerFeedback('produkt');
+
+                        if (reqDiv) {
+                            let scanat = (parseInt(reqDiv.getAttribute('data-scanat')) || 0) + cantitateDeScazut;
+                            let necesar = parseInt(reqDiv.getAttribute('data-necesar')) || 0;
+
+                            reqDiv.setAttribute('data-scanat', scanat);
+                            let elCount = document.getElementById('count-' + idCheie);
+                            if (elCount) elCount.innerText = scanat;
+
+                            if (scanat >= necesar) {
+                                reqDiv.classList.remove('bg-gray-900', 'border-gray-700', 'border-l-4', 'border-l-orange-500');
+                                reqDiv.classList.add('bg-success/20', 'border-success', 'text-success');
+                                let elNume = reqDiv.querySelector('.font-bold.text-gray-200');
+                                let textNumeReal = elNume ? elNume.innerText : numeProdus;
+                                reqDiv.innerHTML = `
+                                    <div class="pr-2"><span class="font-bold line-through text-sm block leading-tight">${textNumeReal}</span> <span class="text-xs text-success"><i class="fa-solid fa-check"></i> ${eanPrimar}</span></div>
+                                    <div class="text-xl font-bold">${scanat} <span class="text-sm font-normal">/ ${necesar}</span></div>
+                                `;
+                            }
+                        }
+
+                        let isScanOnly = document.getElementById('check-scan-only').checked;
+
+                        if (isScanOnly) {
+                            // Mod Turbo: Mesaj scurt, dispare rapid, fără animații greoaie
+                            msgBox.innerHTML = `<div class="text-success text-xs font-bold">✔ ${numeProdus.substring(0,25)} (-${cantitateDeScazut})</div>`;
+                            setTimeout(() => { msgBox.innerHTML = ''; isProcessing = false; }, 400);
+                        } else {
+                            // Mod Normal (cu animația ta clasică)
+                            msgBox.innerHTML = `
+                                <div class="anim-pop">
+                                    <i class="fa-solid fa-circle-check text-5xl text-success mb-1"></i>
+                                    <div class="text-white font-bold">${numeProdus}</div>
+                                    <div class="text-success font-extrabold text-lg">-${cantitateDeScazut} Flaschen</div>
+                                </div>`;
+
+                            let li = document.createElement('li');
+                            li.className = "flex justify-between items-center border-b border-gray-800 pb-2 anim-pop";
+                            li.innerHTML = `
+                                <span class="text-gray-300 truncate pr-2"><i class="fa-solid fa-wine-bottle text-gray-500 text-xs mr-1"></i> ${numeProdus}</span>
+                                <div class="flex items-center gap-3 shrink-0">
+                                    <span class="text-success font-bold text-lg">-${cantitateDeScazut}</span>
+                                    <button onclick="stergeScanare(this, '${eanPrimar}', ${cantitateDeScazut}, '${numeProdus}', '${idCheie}')" class="bg-gray-800 text-red-500 hover:bg-red-500 hover:text-white px-3 py-1.5 rounded transition"><i class="fa-solid fa-trash-can"></i></button>
+                                </div>`;
+
+                            let lista = document.getElementById('lista-produse');
+                            if (lista) lista.insertBefore(li, lista.firstChild);
+
+                            setTimeout(() => {
+                                msgBox.innerHTML = '<div class="text-gray-500 text-xs">Bereit für nächsten Scan...</div>';
+                                isProcessing = false;
+                            }, 2000);
+                        }
+
+                    } else {
+                        triggerFeedback('error');
+                        msgBox.innerHTML = `<div class="anim-pop text-danger"><i class="fa-solid fa-circle-xmark text-4xl mb-1"></i><br>${vindeData.mesaj}</div>`;
+                        setTimeout(() => { isProcessing = false; msgBox.innerHTML = '<div class="text-gray-500 text-xs">Bereit für nächsten Scan...</div>'; }, 2000);
+                    }
+                })
+                .catch(err => {
+                    triggerFeedback('error');
+                    msgBox.innerHTML = `<div class="anim-pop text-danger"><i class="fa-solid fa-triangle-exclamation text-4xl mb-1"></i><br>Fehler beim Speichern der Verkäufe.</div>`;
+                    setTimeout(() => { isProcessing = false; msgBox.innerHTML = '<div class="text-gray-500 text-xs">Bereit für nächsten Scan...</div>'; }, 2000);
+                });
+
+            } else {
+                triggerFeedback('error');
+                msgBox.innerHTML = `<div class="anim-pop text-danger"><i class="fa-solid fa-circle-xmark text-4xl mb-1"></i><br>Produkt nicht im System!</div>`;
+                setTimeout(() => { isProcessing = false; msgBox.innerHTML = '<div class="text-gray-500 text-xs">Bereit für nächsten Scan...</div>'; }, 2000);
+            }
+        })
+        .catch(error => {
+            triggerFeedback('error');
+            isProcessing = false;
+            msgBox.innerHTML = '<div class="text-danger font-bold"><i class="fa-solid fa-wifi"></i> Verbindungsfehler zur Datenbank.</div>';
+            setTimeout(() => { msgBox.innerHTML = '<div class="text-gray-500 text-xs">Bereit für nächsten Scan...</div>'; }, 2000);
+        });
+    }
+}
+
+        function stergeScanare(btnElement, codBare, cantitate, numeProdus, idCheie) {
+            triggerFeedback('delete');
+            let li = btnElement.closest('li');
+            li.style.opacity = '0.5';
+
+            fetch('/api/anuleaza_scanare', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ cod_bare: codBare, cantitate: cantitate, auftrag: auftragNummer })
+            })
+            .then(res => res.json())
+            .then(data => {
+                if (data.status === 'succes') {
+                    li.remove();
+                    totalSticleScazute -= cantitate;
+                    document.getElementById('counter-sticle').innerText = totalSticleScazute + " Fl.";
+
+                    let reqDiv = document.getElementById('req-' + idCheie);
+                    if (reqDiv) {
+                        let scanat = parseInt(reqDiv.getAttribute('data-scanat')) - cantitate;
+                        let necesar = parseInt(reqDiv.getAttribute('data-necesar'));
+                        reqDiv.setAttribute('data-scanat', scanat);
+
+                        if (reqDiv.classList.contains('bg-success/20')) {
+                            reqDiv.classList.remove('bg-success/20', 'border-success', 'text-success');
+                            reqDiv.classList.add('bg-gray-900', 'border-gray-700');
+
+                            let isRabatt = numeProdus.includes("Naturalrabatt");
+                            if(isRabatt) reqDiv.classList.add('border-l-4', 'border-l-orange-500');
+
+                            reqDiv.innerHTML = `
+                                <div class="pr-2">
+                                    <span class="font-bold text-gray-200 text-sm block leading-tight">${numeProdus}</span>
+                                    <span class="text-xs text-gray-500"><i class="fa-solid fa-barcode"></i> ${codBare}</span>
+                                </div>
+                                <div class="text-xl font-bold text-white shrink-0">
+                                    <span id="count-${idCheie}">${scanat}</span> <span class="text-sm text-gray-400 font-normal">/ ${necesar}</span>
+                                </div>
+                            `;
+                        } else {
+                            document.getElementById('count-' + idCheie).innerText = scanat;
+                        }
+                    }
+
+                    let msgBox = document.getElementById('status-mesaj');
+                    msgBox.innerHTML = '<div class="text-red-400 text-sm font-bold anim-pop"><i class="fa-solid fa-trash"></i> Artikel gelöscht & Bestand retourniert.</div>';
+                    setTimeout(() => { msgBox.innerHTML = '<div class="text-gray-500 text-xs">Bereit für nächsten Scan...</div>'; }, 2000);
+                } else {
+                    li.style.opacity = '1';
+                    alert("Fehler beim Löschen: " + data.mesaj);
+                }
+            }).catch(err => {
+                li.style.opacity = '1';
+                alert("Verbindungsfehler.");
+            });
+        }
+        function anuleazaComanda() {
+            let confirma = confirm("Möchten Sie diesen Auftrag abbrechen?\n\n(Bereits gescannte Artikel bleiben im System gespeichert. Sie können später fortfahren.)");
+            if (confirma) {
+                window.location.reload();
+            }
+        }
+        function resetAuftrag() {
+            if(totalSticleScazute === 0) {
+                let confirma = confirm("Sie haben noch keine Produkte gescannt! Trotzdem schließen?");
+                if(!confirma) return;
+            }
+
+            isProcessing = true;
+            triggerFeedback('finish');
+
+            let msgBox = document.getElementById('status-mesaj');
+            msgBox.innerHTML = `
+                <div class="anim-pop">
+                    <i class="fa-solid fa-flag-checkered text-5xl text-blue-500 mb-2"></i>
+                    <div class="text-success font-bold text-lg">Auftrag abgeschlossen!</div>
+                </div>`;
+
+            setTimeout(() => {
+                window.location.reload();
+            }, 1200);
+        }
+    </script>
+</body>
+</html>
