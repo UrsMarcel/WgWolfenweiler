@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="ro">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Die Mit dem Wolf - System</title>
+    
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: { background: '#0F111A', surface: '#1A1D27', primary: '#60A5FA', accent: '#A78BFA' }
+                }
+            }
+        }
+    </script>
+    
+    <style>
+        body { background-color: #0F111A; color: #F3F4F6; }
+        .glow-bg { position: absolute; width: 600px; height: 600px; background: radial-gradient(circle, rgba(96,165,250,0.15) 0%, rgba(15,17,26,0) 70%); top: 50%; left: 50%; transform: translate(-50%, -50%); z-index: -1; pointer-events: none; }
+        .input-field { width: 100%; background-color: #0F111A; border: 1px solid #374151; color: white; padding: 0.75rem 1rem; border-radius: 0.5rem; outline: none; transition: border-color 0.2s, box-shadow 0.2s; }
+        .input-field:focus { border-color: #60A5FA; box-shadow: 0 0 10px rgba(96, 165, 250, 0.2); }
+        
+        #loadingOverlay { display: none; position: fixed; inset: 0; background: rgba(15, 17, 26, 0.9); z-index: 50; flex-direction: column; justify-content: center; align-items: center; }
+        .spinner { position: relative; width: 80px; height: 80px; }
+        .circle-1, .circle-2 { position: absolute; border-radius: 50%; border: 4px solid transparent; }
+        .circle-1 { inset: 0; border-top-color: #60A5FA; border-bottom-color: #60A5FA; animation: spin1 1.2s linear infinite; }
+        .circle-2 { inset: 15px; border-left-color: #A78BFA; border-right-color: #A78BFA; animation: spin2 0.8s linear infinite; }
+        @keyframes spin1 { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+        @keyframes spin2 { 0% { transform: rotate(360deg); } 100% { transform: rotate(0deg); } }
+    </style>
+</head>
+<body class="antialiased h-screen flex items-center justify-center relative overflow-hidden">
+
+    <div class="glow-bg"></div>
+
+    <div class="absolute top-6 right-6 z-20">
+        <select id="langSelect" onchange="schimbaLimba()" class="bg-surface border border-gray-700 text-gray-300 text-sm rounded-lg focus:ring-primary focus:border-primary block p-2 cursor-pointer outline-none">
+            <option value="de">🇩🇪 Deutsch</option>
+            <option value="ro">🇷🇴 Română</option>
+        </select>
+    </div>
+
+    <div class="bg-surface p-10 rounded-3xl border border-gray-800 shadow-2xl w-full max-w-md relative z-10">
+        <div class="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-primary to-transparent rounded-t-3xl"></div>
+        
+        <div class="text-center mb-8 flex flex-col items-center">
+            
+            <!-- LOGO MĂRIT -->
+            <div class="relative w-40 h-40 mb-6 rounded-full border-2 border-primary/50 flex items-center justify-center shadow-[0_0_25px_rgba(96,165,250,0.2)] overflow-hidden bg-gray-900">
+                <img src="{{ url_for('static', filename='lup.png') }}" alt="Die Mit dem Wolf Logo" class="w-full h-full object-cover">
+            </div>
+
+            <!-- TITLU -->
+            <h2 class="text-3xl font-extrabold text-white tracking-wide">Die Mit dem <span class="text-primary">Wolf</span></h2>
+        </div>
+        
+        {% if eroare %}
+            <div class="bg-red-500/10 border border-red-500/30 text-red-400 p-3 rounded-lg text-center mb-6 text-sm font-medium">
+                <i class="fa-solid fa-triangle-exclamation mr-1"></i> {{ eroare }}
+            </div>
+        {% endif %}
+
+        <form action="/login" method="POST" id="loginForm" class="space-y-5">
+            <div>
+                <label id="lblUser" class="block text-sm font-medium text-gray-400 mb-2">Benutzername</label>
+                <div class="relative">
+                    <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-gray-500"><i class="fa-solid fa-user"></i></div>
+                    <input type="text" name="username" id="username" class="input-field pl-10" required autofocus>
+                </div>
+            </div>
+            
+            <div>
+                <label id="lblPass" class="block text-sm font-medium text-gray-400 mb-2">Passwort</label>
+                <div class="relative">
+                    <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-gray-500"><i class="fa-solid fa-key"></i></div>
+                    <input type="password" name="password" id="password" class="input-field pl-10" required>
+                </div>
+            </div>
+            
+            <div class="flex items-center gap-2 pt-2">
+                <input type="checkbox" name="remember" id="remember" class="w-4 h-4 bg-gray-900 border-gray-600 rounded text-primary focus:ring-primary focus:ring-offset-gray-900 cursor-pointer">
+                <label id="lblRemember" for="remember" class="text-sm text-gray-400 cursor-pointer select-none">Angemeldet bleiben</label>
+            </div>
+            
+            <button type="submit" id="btnLogin" class="w-full bg-primary hover:bg-blue-500 text-black font-bold py-3.5 rounded-xl transition shadow-[0_0_20px_rgba(96,165,250,0.2)] mt-4 flex items-center justify-center gap-2">
+                Anmelden <i class="fa-solid fa-arrow-right"></i>
+            </button>
+        </form>
+    </div>
+
+    <div id="loadingOverlay">
+        <div class="spinner">
+            <div class="circle-1"></div>
+            <div class="circle-2"></div>
+        </div>
+        <p id="loadingText" class="text-primary mt-6 text-lg font-bold tracking-widest uppercase">Ladevorgang...</p>
+    </div>
+
+    <script>
+        const texte = {
+            de: {
+                lblUser: "Benutzername", lblPass: "Passwort", lblRemember: "Angemeldet bleiben",
+                btnLogin: "Anmelden <i class='fa-solid fa-arrow-right'></i>", loadTxt: "Ladevorgang..."
+            },
+            ro: {
+                lblUser: "ID Utilizator", lblPass: "Parolă", lblRemember: "Ține-mă minte pe acest dispozitiv",
+                btnLogin: "Conectare <i class='fa-solid fa-arrow-right'></i>", loadTxt: "Se încarcă..."
+            }
+        };
+
+        function schimbaLimba() {
+            let lang = document.getElementById("langSelect").value;
+            document.getElementById("lblUser").innerText = texte[lang].lblUser;
+            document.getElementById("lblPass").innerText = texte[lang].lblPass;
+            document.getElementById("lblRemember").innerText = texte[lang].lblRemember;
+            document.getElementById("btnLogin").innerHTML = texte[lang].btnLogin;
+            document.getElementById("loadingText").innerText = texte[lang].loadTxt;
+        }
+
+        window.onload = function() {
+            const savedUser = localStorage.getItem('facturi_user');
+            const savedPass = localStorage.getItem('facturi_pass');
+            if (savedUser && savedPass) {
+                document.getElementById('username').value = savedUser;
+                document.getElementById('password').value = savedPass;
+                document.getElementById('remember').checked = true;
+            }
+            schimbaLimba(); 
+        };
+
+        document.getElementById('loginForm').addEventListener('submit', function(e) {
+            e.preventDefault(); 
+            
+            if (document.getElementById('remember').checked) {
+                localStorage.setItem('facturi_user', document.getElementById('username').value);
+                localStorage.setItem('facturi_pass', document.getElementById('password').value);
+            } else {
+                localStorage.removeItem('facturi_user');
+                localStorage.removeItem('facturi_pass');
+            }
+
+            document.getElementById('loadingOverlay').style.display = 'flex';
+            
+            setTimeout(() => {
+                this.submit();
+            }, 1500);
+        });
+    </script>
+</body>
+</html>
