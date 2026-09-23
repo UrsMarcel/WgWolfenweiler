@@ -61,12 +61,27 @@ def ask_ai_bot(user_message, db_facts, mood, utilizator):
             method='POST'
         )
         
-        # Timeout setat la 4 secunde pentru a preveni blocarea site-ului
         with urllib.request.urlopen(req, timeout=4.0) as response:
             res_data = json.loads(response.read().decode('utf-8'))
             return res_data['choices'][0]['message']['content']
             
+    except urllib.error.HTTPError as e:
+        # Aici citim răspunsul exact de la server (ex: "Model not found")
+        error_body = e.read().decode('utf-8')
+        error_details = f"HTTP {e.code}:\n{error_body}\n\n{traceback.format_exc()}"
+        db_facts_html = str(db_facts).replace('\n', '<br>')
+        
+        return f"""
+        {MOOD_AVATARS.get(mood, '🤖')} <b>(Eroare API Groq)</b><br>
+        <hr>
+        <b style="color:#ff4444; font-size:14px;">🚨 DETALII EROARE EXACTE:</b><br>
+        <pre style="background:#1e1e1e; color:#ff8888; padding:10px; border-radius:5px; font-size:11px; overflow-x:auto; text-align:left;">{error_details}</pre>
+        <hr>
+        <b>Date extrase din DB:</b><br>{db_facts_html}
+        """
+        
     except Exception as e:
+        # Fallback pentru timeout-uri sau probleme de rețea
         error_details = traceback.format_exc()
         db_facts_html = str(db_facts).replace('\n', '<br>')
         
