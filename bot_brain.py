@@ -151,4 +151,4 @@ def process_message(mesaj_raw, utilizator_curent, session, conn):
         utilizator=utilizator_curent
     )
 
-    return f"<div class='p-3 bg-slate-900/90 border border-slate-700/80 rounded-xl my-2 shadow-lg'>{raspuns_ai}</div>"
+    return f"<div class='p-3 bg-cyan-100 border border-cyan-200 text-slate-900 rounded-xl my-2 shadow-lg'>{raspuns_ai}</div>"
