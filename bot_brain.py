@@ -44,7 +44,7 @@ def ask_ai_bot(user_message, db_facts, mood, utilizator):
 }
     
     payload = {
-        "model": "llama-3.3-70b-versatile",
+        "model": "openai/gpt-oss-120b", # <-- Aici ai modificat modelul
         "messages": [
             {"role": "system", "content": system_prompt},
             {"role": "user", "content": user_message}
@@ -52,7 +52,6 @@ def ask_ai_bot(user_message, db_facts, mood, utilizator):
         "temperature": 0.8,
         "max_tokens": 250
     }
-
     try:
         req = urllib.request.Request(
             url, 
